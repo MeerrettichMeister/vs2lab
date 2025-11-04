@@ -62,6 +62,27 @@ class Client:
         self.logger.info("Client down.")
         return msg_out
 
+    def get(self, name:str):
+        query_obj = {"operation":"get", "name": name}
+        self.sock.send(str(query_obj).encode('utf-8'))
+        answer = self.sock.recv(1024)
+        msg_out = answer.decode("utf-8")
+        print(msg_out)
+        self.sock.close()  # close the connection
+        self.logger.info("Client down.")
+        return msg_out
+
+    def get_all(self):
+        query_obj = {"operation":"getAll"}
+        self.sock.send(str(query_obj).encode('utf-8'))
+        answer = self.sock.recv(1024)
+        msg_out = answer.decode("utf-8")
+        print(msg_out)
+        self.sock.close()  # close the connection
+        self.logger.info("Client down.")
+        return msg_out
+
+
     def close(self):
         """ Close socket """
         self.sock.close()
