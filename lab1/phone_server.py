@@ -46,6 +46,8 @@ class Server:
                         name = obj["name"]
                         if self.database[name] is not None:
                             connection.send(str([(name,self.database[name])]).encode("utf-8"))
+                        else:
+                            connection.send(str([]).encode("uft-8"))
                     elif obj["operation"] == "getAll":
                         entries = []
                         for entry in self.database.keys():
