@@ -46,10 +46,11 @@ class Server:
                         name = obj["name"]
                         if self.database[name] is not None:
                             connection.send(str([(name,self.database[name])]).encode("utf-8"))
-                        pass
                     elif obj["operation"] == "getAll":
-                        connection.send(str([(entry,self.database[entry]) for entry in self.database.keys()]).encode("utf-8"))
-                        pass
+                        entries = []
+                        for entry in self.database.keys():
+                            entries.append((entry,self.database[entry]))
+                        connection.send(str(entries).encode("utf-8"))
                     else:
                         connection.send("Invalid operation".encode("utf-8"))
 
