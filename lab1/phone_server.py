@@ -44,11 +44,11 @@ class Server:
                     obj = ast.literal_eval(data.decode("utf-8"))
                     if obj["operation"] == "get":
                         name = obj["name"]
-                        if self.database[name] is not None:
+                        if self.database.get(name) is not None:
                             connection.send(str([(name,self.database[name])]).encode("utf-8"))
                             self._logger.info("Sent phone number for " + obj["name"])
                         else:
-                            connection.send(str([]).encode("uft-8"))
+                            connection.send(str([]).encode("utf-8"))
                             self._logger.info("No person found, returning empty")
                     elif obj["operation"] == "getAll":
                         entries = []
