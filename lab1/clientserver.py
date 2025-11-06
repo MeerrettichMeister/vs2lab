@@ -65,7 +65,9 @@ class Client:
     def get(self, name:str):
         query_obj = {"operation":"get", "name": name}
         self.sock.send(str(query_obj).encode('utf-8'))
+        self.logger.info("Sent get request for " + name)
         answer = self.sock.recv(1024)
+        self.logger.info("Received answer")
         msg_out = answer.decode("utf-8")
         print(msg_out)
         self.sock.close()  # close the connection
@@ -75,7 +77,9 @@ class Client:
     def get_all(self):
         query_obj = {"operation":"getAll"}
         self.sock.send(str(query_obj).encode('utf-8'))
+        self.logger.info("Sent getAll request")
         answer = self.sock.recv(1024)
+        self.logger.info("Received answer")
         msg_out = answer.decode("utf-8")
         print(msg_out)
         self.sock.close()  # close the connection

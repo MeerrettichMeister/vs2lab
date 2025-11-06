@@ -46,15 +46,19 @@ class Server:
                         name = obj["name"]
                         if self.database[name] is not None:
                             connection.send(str([(name,self.database[name])]).encode("utf-8"))
+                            self._logger.info("Sent phone number for " + obj["name"])
                         else:
                             connection.send(str([]).encode("uft-8"))
+                            self._logger.info("No person found, returning empty")
                     elif obj["operation"] == "getAll":
                         entries = []
                         for entry in self.database.keys():
                             entries.append((entry,self.database[entry]))
                         connection.send(str(entries).encode("utf-8"))
+                        self._logger.info("Sent all entries")
                     else:
                         connection.send("Invalid operation".encode("utf-8"))
+                        self._logger.info("Operation is not suported")
 
                 connection.close()  # close the connection
             except socket.timeout:
