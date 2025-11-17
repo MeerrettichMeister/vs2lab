@@ -1,3 +1,5 @@
+import time
+
 import rpc
 import logging
 
@@ -8,9 +10,14 @@ lab_logging.setup(stream_level=logging.INFO)
 cl = rpc.Client()
 cl.run()
 
-base_list = rpc.DBList({'foo'})
-result_list = cl.append('bar', base_list)
+def print_result(result):
+    print("Result: {}".format(result.value))
 
-print("Result: {}".format(result_list.value))
+base_list = rpc.DBList({'foo'})
+cl.append('bar', base_list, print_result)
+for x in range(20):
+    print(x)
+    time.sleep(1)
+
 
 cl.stop()
