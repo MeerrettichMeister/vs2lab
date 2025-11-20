@@ -15,7 +15,7 @@ def print_result(result):
 
 base_list = rpc.DBList({'foo'})
 cl.append('bar', base_list, print_result)
-for x in range(20):
+for x in range(15):
     print(x)
     time.sleep(1)
 
