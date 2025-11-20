@@ -35,7 +35,7 @@ class TestEchoService(unittest.TestCase):
         """Test simple call"""
         msg = self.client.get_all()
         self.assertEqual(msg,
-                         "[('John Smith', '0721552211'), ('Caroline Smith', '0721552212'), ('Gordon Harper', '0721552213'), ('Piet Edwards', '0721552214'), ('Frida Frikadelle', '0721552215')]")
+                         "[('John Smith', '0721552211'), ('Caroline Smith', '0721552212'), ('Gordon Harper', '0721552213'), ('Piet Edwards', '0721552214'), ('Frida Frikadelle', '0721552215'), ('Björn Schnitzel', '0123456789')]")
 
     def test_no_hit(self):
         msg = self.client.get("Karl Lagerfeld")

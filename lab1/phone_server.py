@@ -27,6 +27,7 @@ class Server:
             "Gordon Harper": "0721552213",
             "Piet Edwards": "0721552214",
             "Frida Frikadelle": "0721552215",
+            "Björn Schnitzel": "0123456789"
         }
 
     def serve(self):
@@ -45,7 +46,7 @@ class Server:
                     if obj["operation"] == "get":
                         name = obj["name"]
                         if self.database.get(name) is not None:
-                            connection.send(str([(name,self.database[name])]).encode("utf-8"))
+                            connection.send(str([(name, self.database[name])]).encode("utf-8"))
                             self._logger.info("Sent phone number for " + obj["name"])
                         else:
                             connection.send(str([]).encode("utf-8"))
@@ -53,7 +54,7 @@ class Server:
                     elif obj["operation"] == "getAll":
                         entries = []
                         for entry in self.database.keys():
-                            entries.append((entry,self.database[entry]))
+                            entries.append((entry, self.database[entry]))
                         connection.send(str(entries).encode("utf-8"))
                         self._logger.info("Sent all entries")
                     else:
