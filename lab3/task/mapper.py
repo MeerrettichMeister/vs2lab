@@ -12,8 +12,8 @@ pull_socket = context.socket(zmq.PULL)
 push_socket1 = context.socket(zmq.PUSH)
 push_socket2 = context.socket(zmq.PUSH)
 
-address5 = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT4;
-address6 = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT5;
+address5 = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT4
+address6 = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT5
 
 push_socket1.connect(address5)
 push_socket2.connect(address6)
@@ -34,4 +34,4 @@ while True:
     print(f"got line {line}")
     for word in line.split():
         print(f"Sending {word}")
-        push_sockets[len(word % 2)].send(pickle.dumps((word, 1)))
+        push_sockets[len(word) % 2].send(pickle.dumps((word, 1)))

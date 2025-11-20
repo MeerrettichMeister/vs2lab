@@ -12,9 +12,9 @@ self_add = ""
 
 match me:
     case "1":
-        self_add = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT5
+        self_add = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT4
     case "2":
-        self_add = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT6
+        self_add = "tcp://" + constPipe.SRC1 + ":" + constPipe.PORT5
 
 context = zmq.Context()
 pull_socket = context.socket(zmq.PULL)  # create a pull socket
