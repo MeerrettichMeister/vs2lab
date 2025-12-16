@@ -151,8 +151,17 @@ class ChordNode:
                                  .format(self.node_id, int(request[1]), int(sender)))
 
                 # look up and return local successor 
-                next_id: int = self.local_successor_node(request[1])
-                self.channel.send_to([sender], (constChord.LOOKUP_REP, next_id))
+                next_id = self.local_successor_node(request[1])
+                # TODO my code
+                if next_id == self.node_id:
+                    self.channel.send_to([sender], (constChord.LOOKUP_REP, next_id))
+                else:
+                    next_id = str(next_id)
+                    self.channel.send_to([next_id],(constChord.LOOKUP_REQ,request[1]))
+                    reply = self.channel.receive_from([next_id])
+                    reply_body = reply[1]
+                    if reply_body[0] == constChord.LOOKUP_REP:
+                        self.channel.send_to([sender], (constChord.LOOKUP_REP, reply_body[1]))
 
                 # Finally do a sanity check
                 if not self.channel.exists(next_id):  # probe for existence

@@ -8,6 +8,7 @@ Chord Application
 """
 
 import logging
+import random
 import sys
 import multiprocessing as mp
 
@@ -29,7 +30,17 @@ class DummyChordClient:
         self.channel.bind(self.node_id)
 
     def run(self):
-        print("Implement me pls...")
+        # print("Implement me pls...")
+
+        members = self.channel.channel.smembers('node')
+        r_node = random.choice(tuple(members)).decode()
+        r_value = int(random.choice(tuple(members)).decode())
+        self.channel.send_to([r_node], (constChord.LOOKUP_REQ, r_value))
+        target = self.channel.receive_from([r_node])
+        target_body = target[1]
+        if target_body[0] == constChord.LOOKUP_REP:
+            print("Name: " + str(target_body[1]))
+
         self.channel.send_to(  # a final multicast
             {i.decode() for i in list(self.channel.channel.smembers('node'))},
             constChord.STOP)
@@ -68,8 +79,8 @@ if __name__ == "__main__":  # if script is started from command line
     mp.set_start_method('spawn')
 
     # create barriers to synchronize bootstrapping
-    bar1 = mp.Barrier(n+1)  # Wait for channel population to complete
-    bar2 = mp.Barrier(n+1)  # Wait for ring construction to complete
+    bar1 = mp.Barrier(n + 1)  # Wait for channel population to complete
+    bar2 = mp.Barrier(n + 1)  # Wait for ring construction to complete
 
     # start n chord nodes in separate processes
     children = []
