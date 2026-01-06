@@ -4,6 +4,13 @@ import time
 
 from constMutex import ENTER, RELEASE, ALLOW, ACTIVE
 
+def vibeify(command):
+    if command == ENTER:
+        return 🙋‍
+    elif command == RELEASE:
+        return 
+    elif command == ALLOW:
+        return 👍
 
 class Process:
     """
@@ -46,12 +53,13 @@ class Process:
         self.peer_name = 'unassigned'  # The original peer name
         self.peer_type = 'unassigned'  # A flag indicating behavior pattern
         self.logger = logging.getLogger("vs2lab.lab5.mutex.process.Process")
+        self.waiting_since = None
 
     def __mapid(self, id='-1'):
         # format channel member address
         if id == '-1':
             id = self.process_id
-        return 'Proc-'+str(id)
+        return "Proc-{:3}".format(id)
 
     def __cleanup_queue(self):
         if len(self.queue) > 0:
@@ -87,6 +95,11 @@ class Process:
         # Multicast release notification
         self.channel.send_to(self.other_processes, msg)
 
+    def __evict(self, process_id):
+        self.all_processes.remove(process_id)
+        self.other_processes.remove(process_id)
+        self.queue = [x for x in self.queue if x[1] != process_id]
+
     def __allowed_to_enter(self):
         # See who has sent a message (the set will hold at most one element per sender)
         processes_with_later_message = set([req[1] for req in self.queue[1:]])
@@ -94,6 +107,21 @@ class Process:
         first_in_queue = self.queue[0][1] == self.process_id
         all_have_answered = len(self.other_processes) == len(
             processes_with_later_message)
+
+        if (time.time() - self.waiting_since) > 15:
+            # someone died before allowing
+            if not all_have_answered:
+                others = set(self.other_processes)
+                missing_peers = others.difference([req[1] for req in self.queue]) #processes_with_later_message)
+                for missing in missing_peers:
+                    self.logger.error("{} - {} (no allow)".format(missing, self.process_id))
+                    self.__evict(missing)
+            # someone died before releasing
+            elif all_have_answered:
+                who_died = self.queue[0][1]
+                self.logger.error("{} - {} (no release)".format(who_died, self.process_id))
+                self.__evict(who_died)
+
         return first_in_queue and all_have_answered
 
     def __receive(self):
@@ -127,7 +155,7 @@ class Process:
             self.logger.info("{} timed out on RECEIVE. Local queue: {}".
                              format(self.__mapid(),
                                     list(map(lambda msg: (
-                                        'Clock '+str(msg[0]),
+                                        '⏱️ {:03}'.format(msg[0]),
                                         self.__mapid(msg[1]),
                                         msg[2]), self.queue))))
 
@@ -159,6 +187,7 @@ class Process:
                 self.logger.debug("{} wants to ENTER CS at CLOCK {}."
                                   .format(self.__mapid(), self.clock))
 
+                self.waiting_since = time.time()
                 self.__request_to_enter()
                 while not self.__allowed_to_enter():
                     self.__receive()
@@ -167,11 +196,11 @@ class Process:
                 sleep_time = random.randint(0, 2000)
                 self.logger.debug("{} enters CS for {} milliseconds."
                                   .format(self.__mapid(), sleep_time))
-                print(" CS <- {}".format(self.__mapid()))
+                print(" {} ⚙️".format(self.__mapid()))
                 time.sleep(sleep_time/1000)
 
                 # ... then leave CS
-                print(" CS -> {}".format(self.__mapid()))
+                print(" {} ✅".format(self.__mapid()))
                 self.__release()
                 continue
 
