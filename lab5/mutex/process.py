@@ -2,8 +2,7 @@ import logging
 import random
 import time
 
-from constMutex import ENTER, RELEASE, ALLOW, ACTIVE
-from lab5.mutex.constMutex import PASSIVE
+from constMutex import ENTER, RELEASE, ALLOW, KILL, ACTIVE, PASSIVE
 
 
 class Process:
@@ -94,6 +93,11 @@ class Process:
         self.other_processes.remove(process_id)
         self.queue = [x for x in self.queue if x[1] != process_id]
 
+    def __excommunicate(self, process_id):
+        request_msg = (self.clock, process_id, KILL)
+        self.channel.send_to(self.other_processes, request_msg)
+        self.__evict(process_id)
+
     def __sanitize(self):
         if (time.time() - self.waiting_since) > 10:
             processes_with_messages = set([req[1] for req in self.queue])
@@ -103,34 +107,31 @@ class Process:
                 to_kill = processes.difference(processes_with_messages)
                 for kill in to_kill:
                     self.logger.error("{}: {} sent no messages".format(self.process_id, kill))
-                    self.__evict(kill)
-
-                self.waiting_since = time.time()
-                return True
-
-            processes_entering_not_allowing = \
-                [process[1] for process in self.queue
-                 # every process that entered
-                 if process[2] == ENTER
-                 # our own allow is not in our queue
-                 and process[1] != self.process_id
-                 and not any([
-                    other for other in self.queue
-                    # that hasn't allowed / conceded
-                    if other[1] == process[1] and other[2] == ALLOW
-                ])]
-
-            if len(processes_entering_not_allowing) > 0:
-                # someone entered without allowing
-                for kill in processes_entering_not_allowing:
-                    if kill != self.process_id:
-                        self.logger.error("{}: {} didn't concede".format(self.process_id, kill))
-                        self.__evict(kill)
+                    self.__excommunicate(kill)
             else:
-                # process in CS is stuck
-                kill = self.queue[0][1]
-                self.logger.error("{}: {} is stuck".format(self.process_id, kill))
-                self.__evict(kill)
+                processes_entering_not_allowing = \
+                    [process[1] for process in self.queue
+                     # every process that entered
+                     if process[2] == ENTER
+                     # our own allow is not in our queue
+                     and process[1] != self.process_id
+                     and not any([
+                        other for other in self.queue
+                        # that hasn't allowed / conceded
+                        if other[1] == process[1] and other[2] == ALLOW
+                    ])]
+
+                if len(processes_entering_not_allowing) > 0:
+                    # someone entered without allowing
+                    for kill in processes_entering_not_allowing:
+                        if kill != self.process_id:
+                            self.logger.error("{}: {} didn't concede".format(self.process_id, kill))
+                            self.__excommunicate(kill)
+                else:
+                    # process in CS is stuck
+                    kill = self.queue[0][1]
+                    self.logger.error("{}: {} is stuck".format(self.process_id, kill))
+                    self.__excommunicate(kill)
 
             self.waiting_since = time.time()
             return True
@@ -157,10 +158,11 @@ class Process:
             self.clock = max(self.clock, msg[0])  # Adjust clock value...
             self.clock = self.clock + 1  # ...and increment
 
-            self.logger.info("{} received {} from {}.".format(
+            self.logger.debug("{} received {} from {}.".format(
                 self.__mapid(),
                 "ENTER" if msg[2] == ENTER
                 else "ALLOW" if msg[2] == ALLOW
+                else "KILL" if msg[2] == KILL
                 else "RELEASE", self.__mapid(msg[1])))
 
             if msg[2] == ENTER:
@@ -174,6 +176,11 @@ class Process:
                 assert self.queue[0][1] == msg[1] and self.queue[0][
                     2] == ENTER, 'State error: inconsistent remote RELEASE'
                 del (self.queue[0])  # Just remove first message
+            elif msg[2] == KILL:
+                kill_id = msg[1]
+                if kill_id in self.all_processes:
+                    self.logger.info("{} has been excommunicated".format(kill_id))
+                    self.__evict(kill_id)
 
             self.__cleanup_queue()  # Finally sort and cleanup the queue
         else:
@@ -230,7 +237,4 @@ class Process:
 
             # Occasionally serve requests to enter (
             if random.choice([True, False]):
-                if self.peer_type == PASSIVE:
-                    # sanity check
-                    self.__sanitize()
                 self.__receive()
