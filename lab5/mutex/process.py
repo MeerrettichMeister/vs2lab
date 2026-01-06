@@ -8,7 +8,7 @@ def vibeify(command):
     if command == ENTER:
         return 🙋‍
     elif command == RELEASE:
-        return 
+        return 👋
     elif command == ALLOW:
         return 👍
 
