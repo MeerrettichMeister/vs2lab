@@ -4,13 +4,6 @@ import time
 
 from constMutex import ENTER, RELEASE, ALLOW, ACTIVE
 
-def vibeify(command):
-    if command == ENTER:
-        return "🙋‍"
-    elif command == RELEASE:
-        return "👋"
-    elif command == ALLOW:
-        return "👍"
 
 class Process:
     """
@@ -59,7 +52,7 @@ class Process:
         # format channel member address
         if id == '-1':
             id = self.process_id
-        return "Proc-{:3}".format(id)
+        return "Proc-{}".format(id)
 
     def __cleanup_queue(self):
         if len(self.queue) > 0:
@@ -105,22 +98,45 @@ class Process:
         processes_with_later_message = set([req[1] for req in self.queue[1:]])
         # Access granted if this process is first in queue and all others have answered (logically) later
         first_in_queue = self.queue[0][1] == self.process_id
-        all_have_answered = len(self.other_processes) == len(
-            processes_with_later_message)
+        all_have_answered = len(self.other_processes) == len(processes_with_later_message)
 
-        if (time.time() - self.waiting_since) > 15:
-            # someone died before allowing
-            if not all_have_answered:
-                others = set(self.other_processes)
-                missing_peers = others.difference([req[1] for req in self.queue]) #processes_with_later_message)
-                for missing in missing_peers:
-                    self.logger.error("{} - {} (no allow)".format(missing, self.process_id))
-                    self.__evict(missing)
-            # someone died before releasing
-            elif all_have_answered:
-                who_died = self.queue[0][1]
-                self.logger.error("{} - {} (no release)".format(who_died, self.process_id))
-                self.__evict(who_died)
+        if (time.time() - self.waiting_since) > 10:
+            processes_with_messages = set([req[1] for req in self.queue])
+            processes = set(self.all_processes)
+            if processes != processes_with_messages:
+                # someone never sent a message
+                to_kill = processes.difference(processes_with_messages)
+                for kill in to_kill:
+                    self.logger.error("{}: {} sent no messages".format(self.process_id, kill))
+                    self.__evict(kill)
+
+                return False
+
+            processes_entering_not_allowing = \
+                [process[1] for process in self.queue
+                # every process that entered
+                if process[2] == ENTER
+                # our own allow is not in our queue
+                and process[1] != self.process_id
+                and not any([
+                   other for other in self.queue
+                   # that hasn't allowed / conceded
+                   if other[1] == process[1] and other[2] == ALLOW
+                ])]
+
+            self.logger.info("Entering/NotAllowing: {}".format(" ".join(processes_entering_not_allowing)))
+
+            if len(processes_entering_not_allowing) > 0:
+                # someone entered without allowing
+                for kill in processes_entering_not_allowing:
+                    if kill != self.process_id:
+                        self.logger.error("{}: {} didn't concede".format(self.process_id, kill))
+                        self.__evict(kill)
+            else:
+                # process in CS is stuck
+                kill = self.queue[0][1]
+                self.logger.error("{}: {} is stuck".format(self.process_id, kill))
+                self.__evict(kill)
 
         return first_in_queue and all_have_answered
 
@@ -147,7 +163,8 @@ class Process:
                 self.queue.append(msg)  # Append an ALLOW
             elif msg[2] == RELEASE:
                 # assure release requester indeed has access (his ENTER is first in queue)
-                assert self.queue[0][1] == msg[1] and self.queue[0][2] == ENTER, 'State error: inconsistent remote RELEASE'
+                assert self.queue[0][1] == msg[1] and self.queue[0][
+                    2] == ENTER, 'State error: inconsistent remote RELEASE'
                 del (self.queue[0])  # Just remove first message
 
             self.__cleanup_queue()  # Finally sort and cleanup the queue
@@ -155,7 +172,7 @@ class Process:
             self.logger.info("{} timed out on RECEIVE. Local queue: {}".
                              format(self.__mapid(),
                                     list(map(lambda msg: (
-                                        '⏱️ {:03}'.format(msg[0]),
+                                        'Clock {}'.format(msg[0]),
                                         self.__mapid(msg[1]),
                                         msg[2]), self.queue))))
 
@@ -181,26 +198,26 @@ class Process:
             # 1) there are more than one process left and
             # 2) this peer has active behavior and
             # 3) random is true
+
+            self.waiting_since = time.time()
+
             if len(self.all_processes) > 1 and \
                     self.peer_type == ACTIVE and \
                     random.choice([True, False]):
-                self.logger.debug("{} wants to ENTER CS at CLOCK {}."
-                                  .format(self.__mapid(), self.clock))
+                self.logger.debug("{} wants to ENTER CS at CLOCK {}.".format(self.__mapid(), self.clock))
 
-                self.waiting_since = time.time()
                 self.__request_to_enter()
                 while not self.__allowed_to_enter():
                     self.__receive()
 
                 # Stay in CS for some time ...
                 sleep_time = random.randint(0, 2000)
-                self.logger.debug("{} enters CS for {} milliseconds."
-                                  .format(self.__mapid(), sleep_time))
-                print(" {} ⚙️".format(self.__mapid()))
-                time.sleep(sleep_time/1000)
+                self.logger.debug("{} enters CS for {} milliseconds.".format(self.__mapid(), sleep_time))
+                print(" {} <-️".format(self.__mapid()))
+                time.sleep(sleep_time / 1000)
 
                 # ... then leave CS
-                print(" {} ✅".format(self.__mapid()))
+                print(" {} ->".format(self.__mapid()))
                 self.__release()
                 continue
 
