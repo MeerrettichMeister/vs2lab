@@ -6,11 +6,11 @@ from constMutex import ENTER, RELEASE, ALLOW, ACTIVE
 
 def vibeify(command):
     if command == ENTER:
-        return 🙋‍
+        return "🙋‍"
     elif command == RELEASE:
-        return 👋
+        return "👋"
     elif command == ALLOW:
-        return 👍
+        return "👍"
 
 class Process:
     """
