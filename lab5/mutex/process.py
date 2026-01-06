@@ -3,6 +3,7 @@ import random
 import time
 
 from constMutex import ENTER, RELEASE, ALLOW, ACTIVE
+from lab5.mutex.constMutex import PASSIVE
 
 
 class Process:
@@ -93,13 +94,7 @@ class Process:
         self.other_processes.remove(process_id)
         self.queue = [x for x in self.queue if x[1] != process_id]
 
-    def __allowed_to_enter(self):
-        # See who has sent a message (the set will hold at most one element per sender)
-        processes_with_later_message = set([req[1] for req in self.queue[1:]])
-        # Access granted if this process is first in queue and all others have answered (logically) later
-        first_in_queue = self.queue[0][1] == self.process_id
-        all_have_answered = len(self.other_processes) == len(processes_with_later_message)
-
+    def __sanitize(self):
         if (time.time() - self.waiting_since) > 10:
             processes_with_messages = set([req[1] for req in self.queue])
             processes = set(self.all_processes)
@@ -110,21 +105,20 @@ class Process:
                     self.logger.error("{}: {} sent no messages".format(self.process_id, kill))
                     self.__evict(kill)
 
-                return False
+                self.waiting_since = time.time()
+                return True
 
             processes_entering_not_allowing = \
                 [process[1] for process in self.queue
-                # every process that entered
-                if process[2] == ENTER
-                # our own allow is not in our queue
-                and process[1] != self.process_id
-                and not any([
-                   other for other in self.queue
-                   # that hasn't allowed / conceded
-                   if other[1] == process[1] and other[2] == ALLOW
+                 # every process that entered
+                 if process[2] == ENTER
+                 # our own allow is not in our queue
+                 and process[1] != self.process_id
+                 and not any([
+                    other for other in self.queue
+                    # that hasn't allowed / conceded
+                    if other[1] == process[1] and other[2] == ALLOW
                 ])]
-
-            self.logger.info("Entering/NotAllowing: {}".format(" ".join(processes_entering_not_allowing)))
 
             if len(processes_entering_not_allowing) > 0:
                 # someone entered without allowing
@@ -138,6 +132,20 @@ class Process:
                 self.logger.error("{}: {} is stuck".format(self.process_id, kill))
                 self.__evict(kill)
 
+            self.waiting_since = time.time()
+            return True
+        return False
+
+    def __allowed_to_enter(self):
+        # See who has sent a message (the set will hold at most one element per sender)
+        processes_with_later_message = set([req[1] for req in self.queue[1:]])
+        # Access granted if this process is first in queue and all others have answered (logically) later
+        first_in_queue = self.queue[0][1] == self.process_id
+        all_have_answered = len(self.other_processes) == len(processes_with_later_message)
+
+        if self.__sanitize():
+            return self.__allowed_to_enter()
+
         return first_in_queue and all_have_answered
 
     def __receive(self):
@@ -149,7 +157,7 @@ class Process:
             self.clock = max(self.clock, msg[0])  # Adjust clock value...
             self.clock = self.clock + 1  # ...and increment
 
-            self.logger.debug("{} received {} from {}.".format(
+            self.logger.info("{} received {} from {}.".format(
                 self.__mapid(),
                 "ENTER" if msg[2] == ENTER
                 else "ALLOW" if msg[2] == ALLOW
@@ -200,7 +208,6 @@ class Process:
             # 3) random is true
 
             self.waiting_since = time.time()
-
             if len(self.all_processes) > 1 and \
                     self.peer_type == ACTIVE and \
                     random.choice([True, False]):
@@ -223,4 +230,7 @@ class Process:
 
             # Occasionally serve requests to enter (
             if random.choice([True, False]):
+                if self.peer_type == PASSIVE:
+                    # sanity check
+                    self.__sanitize()
                 self.__receive()
