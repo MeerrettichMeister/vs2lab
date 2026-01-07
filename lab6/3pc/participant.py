@@ -28,7 +28,7 @@ class Participant:
         self.stable_log = stablelog.create_log(
             "participant-" + self.participant)
         self.logger = logging.getLogger("vs2lab.lab6.2pc.Participant")
-        self.coordinator = {}
+        self.coordinator = set()
         self.all_participants = {}
         self.state = 'NEW'
 
@@ -49,53 +49,70 @@ class Participant:
         self.all_participants = self.channel.subgroup('participant')
         self._enter_state('INIT')  # Start in local INIT state.
 
-    def fallback(self, decision):
-        # Help any other participant when coordinator crashed
-        num_of_others = len(self.all_participants) - 1
-        while num_of_others > 0:
-            num_of_others -= 1
-            msg = self.channel.receive_from(self.all_participants, TIMEOUT * 2)
-            if msg and msg[1] == NEED_DECISION:
-                self.channel.send_to({msg[0]}, decision)
+    def _synchronize(self):
+        designated_replacement = min(self.all_participants)
 
-        return "Participant {} terminated in state {} due to {}.".format(
-            self.participant, self.state, decision)
+        if self.participant == designated_replacement:
+            # Pk READY or ABORT corresponds to C WAIT, so global abort
+            if self.state == 'READY' or self.state == 'ABORT':
+                self._enter_state('ABORT')
+                self.channel.send_to(self.all_participants, GLOBAL_ABORT)
+            elif self.state == 'PRECOMMIT':
+                self._enter_state('COMMIT')
+                self.channel.send_to(self.all_participants, GLOBAL_COMMIT)
+            elif self.state == 'COMMIT': # or self.state == 'ABORT':
+                # everyone should already be here
+                pass
 
+        else:
+            self.coordinator.add(designated_replacement)
+            msg = self.channel.receive_from(self.coordinator, TIMEOUT)
+
+            if msg[1] == GLOBAL_ABORT:
+                self._enter_state('ABORT')
+            elif msg[1] == GLOBAL_COMMIT:
+                if self.state in ['READY', 'PRECOMMIT', 'COMMIT']:
+                    self._enter_state('COMMIT')
+                else:
+                    # cannot transition from other state
+                    pass
 
     def run(self):
         # Wait for start of joint commit
         msg = self.channel.receive_from(self.coordinator, TIMEOUT)
-        if not msg:  # Crashed coordinator - give up entirely
-            # decide to locally abort (before doing anything)
+        # Crashed coordinator - give up entirely
+        if not msg:
+            # early exit, no synchronization necessary
             decision = LOCAL_ABORT
             self._enter_state('ABORT')
-            return self.fallback(decision)
+            return "Participant {} terminated in state {} due to {}.".format(self.participant, self.state, decision)
 
         assert msg[1] == VOTE_REQUEST
-        # Firstly, come to a local decision
-        decision = self._do_work()  # proceed with local activities
+        # await local result
+        decision = self._do_work()
 
-        # If local decision is negative,
-        # then vote for abort and quit directly
+        # If local decision is negative, then vote for abort
         if decision == LOCAL_ABORT:
             self.channel.send_to(self.coordinator, VOTE_ABORT)
             self._enter_state('ABORT')
-            return self.fallback(decision)
-        # If local decision is positive,
-        # we are ready to proceed the joint commit
-        assert decision == LOCAL_SUCCESS
-        self._enter_state('READY')
-        self.channel.send_to(self.coordinator, VOTE_COMMIT)
-        # Wait for coordinator precommit or abort
+        elif decision == LOCAL_SUCCESS:
+            self.channel.send_to(self.coordinator, VOTE_COMMIT)
+            self._enter_state('READY')
+
+        # await for coordinator precommit or abort
         msg = self.channel.receive_from(self.coordinator, TIMEOUT)
 
-        if not msg:  # Crashed coordinator
-            return self.fallback(decision)
+        # Crashed coordinator
+        if not msg:
+            # after sync, we are all either COMMIT or ABORT
+            self._synchronize()
+            return "Participant {} synchronized and terminated in state {}".format(self.participant, self.state)
 
         decision = msg[1]
         if decision == GLOBAL_ABORT:
             self._enter_state('ABORT')
-            return self.fallback(decision)
+            return "Participant {} terminated in state {} due to {}".format(self.participant, self.state, decision)
+
         assert decision == PREPARE_COMMIT
         self._enter_state('PRECOMMIT')
         self.channel.send_to(self.coordinator, READY_COMMIT)
@@ -103,11 +120,11 @@ class Participant:
         # Wait for coordinator global commit or abort
         msg = self.channel.receive_from(self.coordinator, TIMEOUT)
 
-        if not msg:  # Crashed coordinator
-            return self.fallback(decision)
+        if not msg:  # Crashed
+            self._synchronize()
+            return "Participant {} synchronized and terminated in state {}".format(self.participant, self.state)
 
         decision = msg[1]
-        if decision == GLOBAL_COMMIT:
-            self._enter_state('COMMIT')
-
-        return self.fallback(decision)
+        assert decision == GLOBAL_COMMIT
+        self._enter_state('COMMIT')
+        return "Participant {} terminated in state {} due to {}".format(self.participant, self.state, decision)
