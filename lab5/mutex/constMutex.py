@@ -2,6 +2,7 @@
 ENTER = 'ENTER'
 ALLOW = 'ALLOW'
 RELEASE = 'RELEASE'
+KILL = 'KILL'
 # Process behaviors
 ACTIVE = 'ACTIVE'
 PASSIVE = 'PASSIVE'
