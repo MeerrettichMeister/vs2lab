@@ -34,7 +34,7 @@ class DummyChordClient:
 
         members = self.channel.channel.smembers('node')
         r_node = random.choice(tuple(members)).decode()
-        r_value = int(random.choice(tuple(members)).decode())
+        r_value = random.randint(0,63)
         self.channel.send_to([r_node], (constChord.LOOKUP_REQ, r_value))
         target = self.channel.receive_from([r_node])
         target_body = target[1]
